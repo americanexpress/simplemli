@@ -29,47 +29,47 @@ type MLICase struct {
 
 func TestMLIs(t *testing.T) {
 	mc := []MLICase{
-		MLICase{
+		{
 			Name:    "2I",
 			Size:    Size2I,
 			Encoded: "002d",
 			Invalid: "0001",
 			Value:   43,
 		},
-		MLICase{
+		{
 			Name:    "2E",
 			Size:    Size2E,
 			Encoded: "002b",
 			Value:   43,
 		},
-		MLICase{
+		{
 			Name:    "4I",
 			Size:    Size4I,
 			Encoded: "00000035",
 			Invalid: "00000001",
 			Value:   49,
 		},
-		MLICase{
+		{
 			Name:    "4E",
 			Size:    Size4E,
 			Encoded: "00000022",
 			Value:   34,
 		},
-		MLICase{
+		{
 			Name:           "2EE",
 			Size:           Size2EE,
 			Encoded:        "0036",
 			Value:          56,
 			EmbeddedHeader: 2,
 		},
-		MLICase{
+		{
 			Name:    "2BCD2",
 			Size:    Size2BCD2,
 			Encoded: "00000288",
 			Invalid: "00000001",
 			Value:   284,
 		},
-		MLICase{
+		{
 			Name:    "A4E",
 			Size:    SizeA4E,
 			Encoded: "30303433",

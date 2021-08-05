@@ -2,6 +2,11 @@
 
 A Message Length Indicator Encoder/Decoder
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/americanexpress/simplemli)](https://pkg.go.dev/github.com/americanexpress/simplemli)
+[![Build Status](https://www.travis-ci.com/americanexpress/simplemli.svg?branch=main)](https://www.travis-ci.com/americanexpress/simplemli)
+[![Coverage Status](https://coveralls.io/repos/github/americanexpress/simplemli/badge.svg?branch=main)](https://coveralls.io/github/americanexpress/simplemli?branch=main)
+[![Go Report Card](https://goreportcard.com/badge/github.com/americanexpress/simplemli)](https://goreportcard.com/report/github.com/americanexpress/simplemli)
+
 Message Length Indicators (MLI) are commonly used in communications over raw TCP/IP sockets. This method of denoting 
 message length is especially popular with users of [ISO 8583](https://en.wikipedia.org/wiki/ISO_8583) messages, a 
 common communication protocol for financial transactions.
