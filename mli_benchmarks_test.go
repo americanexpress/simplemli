@@ -29,6 +29,8 @@ func BenchmarkEncoding(b *testing.B) {
 	}
 	for _, k := range mliTypes {
 		b.Run("Encoding "+k, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_, _ = Encode(k, 1500)
 			}
@@ -36,6 +38,8 @@ func BenchmarkEncoding(b *testing.B) {
 
 		x, _ := Encode(k, 1500)
 		b.Run("Decoding "+k, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_, _ = Decode(k, &x)
 			}
