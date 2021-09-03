@@ -66,6 +66,7 @@ There are many common ways to encode message lengths and this library attempts t
 package simplemli
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -232,16 +233,12 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Check for edge case of 0 in hex format
-		if hex.EncodeToString(*b) == "00000000" {
+		if bytes.Count(*b, []byte{'0'}) == len(*b) {
 			return 0, nil
 		}
 
 		// Convert to integer from ASCII
-		s := fmt.Sprintf("%s", *b)
-		if s == "0000" {
-			return 0, nil
-		}
-		n, err := strconv.Atoi(s)
+		n, err := strconv.Atoi(string(*b))
 		if err != nil {
 			return 0, fmt.Errorf("unable to convert string values to integer - %s", err)
 		}
