@@ -71,6 +71,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"unsafe"
 )
 
 // empty is used as a quick return during errors
@@ -238,7 +239,7 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Convert to integer from ASCII
-		n, err := strconv.Atoi(string(*b))
+		n, err := strconv.Atoi(unsafeByteToStr(*b))
 		if err != nil {
 			return 0, fmt.Errorf("unable to convert string values to integer - %s", err)
 		}
@@ -247,6 +248,10 @@ func Decode(key string, b *[]byte) (int, error) {
 	default:
 		return 0, fmt.Errorf("Invalid MLI type provided")
 	}
+}
+
+func unsafeByteToStr(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
 
 // Encode will accept a message length type and message length value desired. Encode will return a byte slice which
