@@ -31,4 +31,6 @@ jobs:
       run: go test --race -v -covermode=atomic -coverprofile=coverage.out ./...
 
     - name: Update Coveralls
+      env:
+        COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
       run: goveralls -coverprofile=coverage.out -service=github
