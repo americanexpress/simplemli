@@ -31,7 +31,7 @@ Usage:
 		msg := []byte("This is a message")
 
 		// Encoding Example
-		mli, err := simplemli.Encode(simplemli.2I, len(msg))
+		mli, err := simplemli.Encode(simplemli.MLI2I, len(msg))
 		if err != nil {
 			// Do something
 		}
@@ -51,7 +51,7 @@ Usage:
 		}
 
 		// Decoding Example
-		length, err := simplemli.Decode(simplemli.2I, &b)
+		length, err := simplemli.Decode(simplemli.MLI2I, &b)
 		if err != nil {
 			// Do something
 		}
