@@ -3,7 +3,7 @@
 A Message Length Indicator Encoder/Decoder
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/americanexpress/simplemli)](https://pkg.go.dev/github.com/americanexpress/simplemli)
-[![Build Status](https://www.travis-ci.com/americanexpress/simplemli.svg?branch=main)](https://www.travis-ci.com/americanexpress/simplemli)
+[![Build](https://github.com/americanexpress/simplemli/actions/workflows/tests.yml/badge.svg)](https://github.com/americanexpress/simplemli/actions/workflows/tests.yml)
 [![Coverage Status](https://coveralls.io/repos/github/americanexpress/simplemli/badge.svg?branch=main)](https://coveralls.io/github/americanexpress/simplemli?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/americanexpress/simplemli)](https://goreportcard.com/report/github.com/americanexpress/simplemli)
 
