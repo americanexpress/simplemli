@@ -15,6 +15,7 @@ package simplemli
 
 import (
 	"encoding/hex"
+	"math"
 	"testing"
 )
 
@@ -86,7 +87,7 @@ func TestMLIs(t *testing.T) {
 				t.FailNow()
 			}
 
-			n, err := Decode(c.Name, &b)
+			n, err := Decode(c.Name, b)
 			if err != nil {
 				t.Errorf("Unexpected error decoding sample MLI - %s", err)
 			}
@@ -116,7 +117,7 @@ func TestMLIs(t *testing.T) {
 				t.FailNow()
 			}
 
-			n, err := Decode(c.Name, &b)
+			n, err := Decode(c.Name, b)
 			if err != nil {
 				t.Errorf("Unexpected error decoding sample MLI - %s", err)
 			}
@@ -135,7 +136,7 @@ func TestMLIs(t *testing.T) {
 				t.FailNow()
 			}
 
-			n, err := Decode(c.Name, &b)
+			n, err := Decode(c.Name, b)
 			if err != nil {
 				t.Errorf("Unexpected error decoding sample MLI - %s", err)
 			}
@@ -154,7 +155,7 @@ func TestMLIs(t *testing.T) {
 					t.FailNow()
 				}
 
-				_, err = Decode(c.Name, &b)
+				_, err = Decode(c.Name, b)
 				if err == nil || err != ErrLength {
 					t.Errorf("Expected error decoding invalid MLI got %s", err)
 				}
@@ -180,7 +181,7 @@ func TestInvalid(t *testing.T) {
 	})
 
 	t.Run("Decode", func(t *testing.T) {
-		_, err := Decode("Invalid", &empty)
+		_, err := Decode("Invalid", []byte{})
 		if err == nil {
 			t.Errorf("Expected error when calling Decode with bad mli type - got nil")
 		}
@@ -188,7 +189,7 @@ func TestInvalid(t *testing.T) {
 
 	t.Run("A4E Random String", func(t *testing.T) {
 		b := []byte("helo")
-		_, err := Decode("A4E", &b)
+		_, err := Decode("A4E", b)
 		if err == nil {
 			t.Errorf("Expected error when feeding decode a random string - got nil")
 		}
@@ -207,7 +208,7 @@ func TestBadSizedBytes(t *testing.T) {
 	for k, v := range tl {
 		t.Run(k+" Bigger than expected test", func(t *testing.T) {
 			b := make([]byte, v+10000)
-			_, err := Decode(k, &b)
+			_, err := Decode(k, b)
 			if err == nil {
 				t.Errorf("Expected error when sending too big byte slice to decode sent %d for mli type %s", len(b), k)
 			}
@@ -215,9 +216,33 @@ func TestBadSizedBytes(t *testing.T) {
 
 		t.Run(k+" Smaller than expected test", func(t *testing.T) {
 			b := make([]byte, v-1)
-			_, err := Decode(k, &b)
+			_, err := Decode(k, b)
 			if err == nil {
 				t.Errorf("Expected error when sending too small byte slice to decode sent %d for mli type %s", len(b), k)
+			}
+		})
+	}
+}
+
+func TestOverflow(t *testing.T) {
+	cases := []struct {
+		name   string
+		length int
+	}{
+		{"2I", math.MaxUint16 - 1},
+		{"2E", math.MaxUint16 + 1},
+		{"4I", math.MaxUint32 - 3},
+		{"4E", math.MaxUint32 + 1},
+		{"2EE", math.MaxUint16 + 3},
+		{"2BCD2", 10000 - 4},
+		{"A4E", 10000},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name+" Overflow", func(t *testing.T) {
+			_, err := Encode(c.name, c.length)
+			if err != ErrOverflow {
+				t.Errorf("Expected ErrOverflow for %s with length %d, got %v", c.name, c.length, err)
 			}
 		})
 	}
