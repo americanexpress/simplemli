@@ -10,11 +10,50 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
+.PHONY: all clean tests lint build format benchmarks benchmarks-race coverage
+
+all: build tests lint
+
 tests:
 	@echo "Running Tests with Coverage Report"
-	go test -v -covermode=atomic -race -coverprofile=coverage.out ./...
-	go tool cover -html=./coverage.out -o ./coverage.html
+	go test -race ./...
 
 benchmarks:
 	@echo "Running Benchmarks"
-	go test -run=Bench -count=3 -bench . ./...
+	go test -run=^$$ -bench=. -benchmem ./...
+
+benchmarks-race:
+	@echo "Running Benchmarks with Race Detection"
+	go test -race -run=^$$ -bench=. -benchmem ./...
+
+build:
+	@echo "Building package"
+	go build ./...
+
+format:
+	@echo "Formatting code"
+	gofmt -s -w .
+	@if command -v golines >/dev/null 2>&1; then \
+		golines -w .; \
+	else \
+		echo "golines not installed, skipping line wrapping"; \
+	fi
+
+lint:
+	@echo "Linting code"
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --enable-only=misspell --enable-only=revive --enable-only=errname ./...; \
+	else \
+		echo "golangci-lint not installed, skipping lint"; \
+	fi
+
+coverage:
+	@echo "Running coverage"
+	go test -race -covermode=atomic -coverprofile=coverage.out ./...
+	go tool cover -html=./coverage.out -o ./coverage.html
+
+clean:
+	@echo "Cleaning build artifacts"
+	@find . -type f -name "*.test" -delete
+	@find . -type f -name "coverage.out" -delete
+	@find . -type f -name "coverage.html" -delete
