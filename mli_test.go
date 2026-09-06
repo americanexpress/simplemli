@@ -207,6 +207,13 @@ func TestBadSizedBytes(t *testing.T) {
 		"A4E":   SizeA4E,
 	}
 	for k, v := range tl {
+		t.Run(k+" Nil input test", func(t *testing.T) {
+			_, err := Decode(k, nil)
+			if !errors.Is(err, ErrByteSize) {
+				t.Fatalf("Decode(%q, nil) error = %v, want %v", k, err, ErrByteSize)
+			}
+		})
+
 		t.Run(k+" Bigger than expected test", func(t *testing.T) {
 			b := make([]byte, v+10000)
 			_, err := Decode(k, &b)
@@ -316,7 +323,6 @@ func TestDecodeMalformedValues(t *testing.T) {
 		input     []byte
 		wantError bool
 	}{
-		{name: "nil input pointer", key: MLI2I, input: nil, wantError: true},
 		{name: "2BCD2 invalid decimal nibble", key: MLI2BCD2, input: []byte{0x00, 0x00, 0x00, 0x0a}, wantError: true},
 		{name: "A4E non-decimal ascii", key: MLIA4E, input: []byte("12a4"), wantError: true},
 		{name: "A4E zero ascii", key: MLIA4E, input: []byte("0000")},
@@ -324,12 +330,7 @@ func TestDecodeMalformedValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var err error
-			if tt.input == nil {
-				_, err = Decode(tt.key, nil)
-			} else {
-				_, err = Decode(tt.key, &tt.input)
-			}
+			_, err := Decode(tt.key, &tt.input)
 
 			if tt.wantError && err == nil {
 				t.Fatal("Decode() expected error, got nil")
