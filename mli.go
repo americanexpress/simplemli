@@ -76,11 +76,19 @@ import (
 // empty is used as a quick return during errors
 var empty = make([]byte, 0)
 
+// Internal wire-format limits use int64 so validation behaves consistently on 32-bit and 64-bit platforms.
 const (
+	// maxUint16Length is the largest value representable by a two-byte unsigned binary MLI.
 	maxUint16Length = int64(1<<16 - 1)
+
+	// maxUint32Length is the largest value representable by a four-byte unsigned binary MLI.
 	maxUint32Length = int64(1<<32 - 1)
-	maxBCDLength    = int64(9999)
-	maxA4ELength    = int64(9999)
+
+	// maxBCDLength is the largest four-digit value representable by the two-byte packed-decimal field in a 2BCD2 MLI.
+	maxBCDLength = int64(9999)
+
+	// maxA4ELength is the largest four-digit decimal value representable by a four-byte ASCII MLI.
+	maxA4ELength = int64(9999)
 )
 
 // MLI Size in bytes
