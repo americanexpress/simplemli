@@ -190,18 +190,17 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
+		n := binary.BigEndian.Uint32(*b)
 		// If 0 return right away
 		if n == 0 {
 			return 0, nil
 		}
 
 		// Remove MLI length and validate message length is valid
-		n = n - Size4I
-		if n < 0 {
+		if n < Size4I {
 			return 0, ErrLength
 		}
-		return n, nil
+		return uint32ToInt(n - Size4I)
 
 	case MLI4E:
 		// Validate length vs expected length
@@ -210,8 +209,7 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
-		return n, nil
+		return uint32ToInt(binary.BigEndian.Uint32(*b))
 
 	case MLI2EE:
 		// Validate length vs expected length
@@ -361,13 +359,21 @@ func Encode(key string, length int) ([]byte, error) {
 			return empty, err
 		}
 
-		// Create MLI in Hex-ASCII format
+		// Create MLI as a four-byte ASCII decimal string
 		return []byte(fmt.Sprintf("%04d", length)), nil
 
 	default:
 		// Preserve historical error text for callers that compare Error() output.
 		return empty, fmt.Errorf("Invalid MLI type provided") //nolint:staticcheck
 	}
+}
+
+// uint32ToInt rejects wire values that cannot fit in the platform's int type.
+func uint32ToInt(n uint32) (int, error) {
+	if uint64(n) > uint64(^uint(0)>>1) {
+		return 0, ErrLength
+	}
+	return int(n), nil
 }
 
 func validateLength(length int, minLength, maxLength int64) error {
