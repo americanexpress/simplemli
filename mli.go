@@ -66,16 +66,30 @@ There are many common ways to encode message lengths and this library attempts t
 package simplemli
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
-	"unsafe"
 )
 
 // empty is used as a quick return during errors
 var empty = make([]byte, 0)
+
+// Internal wire-format limits use int64 so validation behaves consistently on 32-bit and 64-bit platforms.
+const (
+	// maxUint16Length is the largest value representable by a two-byte unsigned binary MLI.
+	maxUint16Length = int64(1<<16 - 1)
+
+	// maxUint32Length is the largest value representable by a four-byte unsigned binary MLI.
+	maxUint32Length = int64(1<<32 - 1)
+
+	// maxBCDLength is the largest four-digit value representable by the two-byte packed-decimal field in a 2BCD2 MLI.
+	maxBCDLength = int64(9999)
+
+	// maxA4ELength is the largest four-digit decimal value representable by a four-byte ASCII MLI.
+	maxA4ELength = int64(9999)
+)
 
 // MLI Size in bytes
 const (
@@ -113,10 +127,11 @@ const (
 )
 
 // ErrByteSize reports an attempt to decode byte data that does not match the expected size for the desired MLI type.
-var ErrByteSize = fmt.Errorf("input bytes does not match expected size for selected mli type")
+var ErrByteSize = errors.New("input bytes does not match expected size for selected mli type")
 
-// ErrLength reports an attempt to decode or encode data with an invalid length (i.e., negative numbers).
-var ErrLength = fmt.Errorf("invalid mli length provided")
+// ErrLength reports an attempt to decode or encode data with an invalid length, such as a negative value or an
+// encoded value that cannot fit in the selected MLI type.
+var ErrLength = errors.New("invalid mli length provided")
 
 // Decode accepts a message length in bytes and decodes the value into an integer. The byte slice provided to Decode
 // must be the message length indicator itself and not include message headers or body. If the provided byte size does
@@ -133,6 +148,10 @@ var ErrLength = fmt.Errorf("invalid mli length provided")
 // Note: 2EE Message Length Indicators are unique in that they contain a 2-byte header which is not accounted for in
 // the message length. When decoding a 2EE MLI of 1500, the return value will include the header length, 1502.
 func Decode(key string, b *[]byte) (int, error) {
+	if b == nil {
+		return 0, ErrByteSize
+	}
+
 	switch key {
 	case MLI2I:
 		// Validate length vs. expected length
@@ -171,18 +190,17 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
+		n := binary.BigEndian.Uint32(*b)
 		// If 0 return right away
 		if n == 0 {
 			return 0, nil
 		}
 
 		// Remove MLI length and validate message length is valid
-		n = n - Size4I
-		if n < 0 {
+		if n < Size4I {
 			return 0, ErrLength
 		}
-		return n, nil
+		return uint32ToInt(n - Size4I)
 
 	case MLI4E:
 		// Validate length vs expected length
@@ -191,8 +209,7 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
-		return n, nil
+		return uint32ToInt(binary.BigEndian.Uint32(*b))
 
 	case MLI2EE:
 		// Validate length vs expected length
@@ -213,7 +230,7 @@ func Decode(key string, b *[]byte) (int, error) {
 		// Convert from hex to integer using Binary-Coded Decimal
 		n, err := strconv.Atoi(hex.EncodeToString((*b)[2:4]))
 		if err != nil {
-			return 0, fmt.Errorf("could not convert hex string to integer - %s", err)
+			return 0, fmt.Errorf("could not convert hex string to integer: %w", err)
 		}
 		// If 0 return right away
 		if n == 0 {
@@ -234,24 +251,21 @@ func Decode(key string, b *[]byte) (int, error) {
 		}
 
 		// Check for edge case of 0 in hex format
-		if bytes.Count(*b, []byte{'0'}) == len(*b) {
+		if string(*b) == "0000" {
 			return 0, nil
 		}
 
 		// Convert to integer from ASCII
-		n, err := strconv.Atoi(unsafeByteToStr(*b))
+		n, err := strconv.Atoi(string(*b))
 		if err != nil {
-			return 0, fmt.Errorf("unable to convert string values to integer - %s", err)
+			return 0, fmt.Errorf("unable to convert string values to integer: %w", err)
 		}
 		return n, nil
 
 	default:
-		return 0, fmt.Errorf("Invalid MLI type provided")
+		// Preserve historical error text for callers that compare Error() output.
+		return 0, fmt.Errorf("Invalid MLI type provided") //nolint:staticcheck
 	}
-}
-
-func unsafeByteToStr(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
 }
 
 // Encode will accept a message length type and message length value desired. Encode will return a byte slice which
@@ -276,40 +290,64 @@ func Encode(key string, length int) ([]byte, error) {
 
 	switch key {
 	case MLI2I:
+		if err := validateLength(length, 0, maxUint16Length-Size2I); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Network Byte Order
 		b := make([]byte, Size2I)
 		binary.BigEndian.PutUint16(b, uint16(length+Size2I)) // include mli size
 		return b, nil
 
 	case MLI2E:
+		if err := validateLength(length, 0, maxUint16Length); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Network Byte Order
 		b := make([]byte, Size2E)
 		binary.BigEndian.PutUint16(b, uint16(length))
 		return b, nil
 
 	case MLI4I:
+		if err := validateLength(length, 0, maxUint32Length-Size4I); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Network Byte Order
 		b := make([]byte, Size4I)
 		binary.BigEndian.PutUint32(b, uint32(length+Size4I)) // include mli size
 		return b, nil
 
 	case MLI4E:
+		if err := validateLength(length, 0, maxUint32Length); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Network Byte Order
 		b := make([]byte, Size4E)
 		binary.BigEndian.PutUint32(b, uint32(length))
 		return b, nil
 
 	case MLI2EE:
+		if err := validateLength(length, Size2EE, maxUint16Length+Size2EE); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Network Byte Order
 		b := make([]byte, Size2EE)
 		binary.BigEndian.PutUint16(b, uint16(length-Size2EE)) // remove embedded 2-byte header length
 		return b, nil
 
 	case MLI2BCD2:
+		if err := validateLength(length, 0, maxBCDLength-Size2BCD2); err != nil {
+			return empty, err
+		}
+
 		// Create MLI in Binary-Coded Decimal
 		h, err := hex.DecodeString(fmt.Sprintf("%04d", length+Size2BCD2)) // %04d is binary-coded decimal format, wrap in hex
 		if err != nil {
-			return empty, fmt.Errorf("unable to convert length to hex binary-coded decimal - %s", err)
+			return empty, fmt.Errorf("unable to convert length to hex binary-coded decimal: %w", err)
 		}
 		// Create empty 2-byte header
 		b := make([]byte, 2)
@@ -317,13 +355,31 @@ func Encode(key string, length int) ([]byte, error) {
 		return b, nil
 
 	case MLIA4E:
-		// Create MLI in Hex-ASCII format
-		s := fmt.Sprintf("%04d", length)
-		s = fmt.Sprintf("%X", s)
-		b, _ := hex.DecodeString(s)
-		return b, nil
+		if err := validateLength(length, 0, maxA4ELength); err != nil {
+			return empty, err
+		}
+
+		// Create MLI as a four-byte ASCII decimal string
+		return []byte(fmt.Sprintf("%04d", length)), nil
 
 	default:
-		return empty, fmt.Errorf("Invalid MLI type provided")
+		// Preserve historical error text for callers that compare Error() output.
+		return empty, fmt.Errorf("Invalid MLI type provided") //nolint:staticcheck
 	}
+}
+
+// uint32ToInt rejects wire values that cannot fit in the platform's int type.
+func uint32ToInt(n uint32) (int, error) {
+	if uint64(n) > uint64(^uint(0)>>1) {
+		return 0, ErrLength
+	}
+	return int(n), nil
+}
+
+func validateLength(length int, minLength, maxLength int64) error {
+	n := int64(length)
+	if n < minLength || n > maxLength {
+		return ErrLength
+	}
+	return nil
 }
