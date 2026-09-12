@@ -13,55 +13,15 @@
  */
 
 /*
-Package simplemli is a Message Length Indicator Encoder/Decoder.
+Package simplemli encodes and decodes Message Length Indicators (MLIs), which
+frame messages sent over stream transports such as TCP. MLIs are commonly used
+with ISO 8583 financial messages.
 
-Message Length Indicators (MLI) are commonly used in communications over raw TCP/IP sockets. This method of denoting
-message length is especially popular with users of ISO 8583 messages, a common communication protocol for financial
-transactions.
-
-This package provides an easy-to-use Encoder and Decoder for Message Length Indicators.
-
-Usage:
-
-	import (
-		"github.com/americanexpress/simplemli"
-	)
-
-	func main() {
-		msg := []byte("This is a message")
-
-		// Encoding Example
-		mli, err := simplemli.Encode(simplemli.MLI2I, len(msg))
-		if err != nil {
-			// Do something
-		}
-
-		// Append the MLI to the message
-		msg := append(mli, msg)
-
-		// Write to TCP Connection
-		_, err = conn.Write(msg)
-
-
-		// Reading MLI from TCP Connection
-		b := make([]byte, simplemli.Size2I)
-		_, err = conn.Read(&b) // only read the MLI from buffer
-		if err != nil {
-			// Do something
-		}
-
-		// Decoding Example
-		length, err := simplemli.Decode(simplemli.MLI2I, &b)
-		if err != nil {
-			// Do something
-		}
-
-		// Reading Message from TCP Connection
-		msg := make([]byte, length)
-		_, err = conn.Read(&msg)
-	}
-
-There are many common ways to encode message lengths and this library attempts to provide the most common MLI types.
+[Encode] accepts a message length and returns its MLI. [Decode] accepts only the
+MLI bytes and returns the message length. Inclusive MLI types include the MLI's
+own size in their wire value; Encode and Decode add or remove that size for the
+caller. For 2EE, the input and returned length include the message's additional
+two-byte embedded header.
 */
 package simplemli
 
@@ -133,9 +93,9 @@ var ErrByteSize = errors.New("input bytes does not match expected size for selec
 // encoded value that cannot fit in the selected MLI type.
 var ErrLength = errors.New("invalid mli length provided")
 
-// Decode accepts a message length in bytes and decodes the value into an integer. The byte slice provided to Decode
-// must be the message length indicator itself and not include message headers or body. If the provided byte size does
-// not match the expected MLI size, Decode will return an error.
+// Decode converts an MLI into its message length. b must contain only the MLI,
+// without the message header or body. Decode returns [ErrByteSize] when b is nil
+// or its size does not match key.
 //
 // The return value provided by Decode will exclude the length of the MLI and provide the length of the message itself.
 // For example, a 2I MLI of 1502 will return 1500 when Decoded.
@@ -145,8 +105,11 @@ var ErrLength = errors.New("invalid mli length provided")
 //		// Do something
 //	}
 //
-// Note: 2EE Message Length Indicators are unique in that they contain a 2-byte header which is not accounted for in
-// the message length. When decoding a 2EE MLI of 1500, the return value will include the header length, 1502.
+// For 2EE, the returned length includes the message's additional two-byte
+// embedded header. A 2EE MLI value of 1500 therefore returns 1502.
+//
+// On platforms with a 32-bit int, Decode returns [ErrLength] when a 4I or 4E
+// result cannot fit in int.
 func Decode(key string, b *[]byte) (int, error) {
 	if b == nil {
 		return 0, ErrByteSize
@@ -268,8 +231,9 @@ func Decode(key string, b *[]byte) (int, error) {
 	}
 }
 
-// Encode will accept a message length type and message length value desired. Encode will return a byte slice which
-// contains a MLI formatted for in the desired message length type.
+// Encode converts length into the MLI selected by key. length must exclude the
+// MLI itself. Encode returns [ErrLength] when length is negative or outside the
+// selected format's range.
 //
 // For inclusive MLI types, the Encode function will add the MLI length to the returned encoded MLI. In all cases,
 // users should provide the message length without including MLI length.
@@ -279,9 +243,19 @@ func Decode(key string, b *[]byte) (int, error) {
 //		// Do something
 //	}
 //
-// Note: 2EE Message Length Indicators are unique in that the messages should include a 2-byte embedded header which is
-// not accounted for in the MLI. When encoding a 2EE MLI, users should include the embedded header in the length value.
-// For example, a message of 1500 bytes, with a 2-byte embedded header will have a 2EE MLI value of 1500.
+// Supported length ranges are:
+//
+//	2I:    0 through 65,533
+//	2E:    0 through 65,535
+//	4I:    0 through 4,294,967,291, limited by the platform's maximum int
+//	4E:    0 through 4,294,967,295, limited by the platform's maximum int
+//	2EE:   2 through 65,537
+//	2BCD2: 0 through 9,995
+//	A4E:   0 through 9,999
+//
+// For 2EE, length includes the message's additional two-byte embedded header.
+// A 1500-byte body plus its header is passed as 1502 and produces an MLI value
+// of 1500.
 func Encode(key string, length int) ([]byte, error) {
 	// Reject negative values
 	if length < 0 {
