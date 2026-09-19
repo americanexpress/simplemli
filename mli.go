@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -356,4 +357,54 @@ func validateLength(length int, minLength, maxLength int64) error {
 		return ErrLength
 	}
 	return nil
+}
+
+// EncodeWriter encodes the length into the MLI selected by key and writes it to w.
+// length must exclude the MLI itself. Returns [ErrLength] when length is negative
+// or outside the selected format's range.
+func EncodeWriter(w io.Writer, key string, length int) error {
+	b, err := Encode(key, length)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(b)
+	return err
+}
+
+// DecodeReader reads the MLI bytes from r for the given key and returns the decoded message length.
+// Returns [ErrByteSize] if the reader doesn't provide enough bytes.
+// Returns [ErrLength] if the decoded value is invalid for the MLI type.
+func DecodeReader(r io.Reader, key string) (int, error) {
+	size := mliSize(key)
+	if size == 0 {
+		return 0, fmt.Errorf("Invalid MLI type provided")
+	}
+
+	b := make([]byte, size)
+	if _, err := io.ReadFull(r, b); err != nil {
+		return 0, ErrByteSize
+	}
+
+	return Decode(key, &b)
+}
+
+func mliSize(key string) int {
+	switch key {
+	case MLI2I:
+		return Size2I
+	case MLI2E:
+		return Size2E
+	case MLI4I:
+		return Size4I
+	case MLI4E:
+		return Size4E
+	case MLI2EE:
+		return Size2EE
+	case MLI2BCD2:
+		return Size2BCD2
+	case MLIA4E:
+		return SizeA4E
+	default:
+		return 0
+	}
 }

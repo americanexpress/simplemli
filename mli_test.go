@@ -14,6 +14,7 @@
 package simplemli
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -358,6 +359,120 @@ func FuzzDecode(f *testing.F) {
 			_, _ = Decode(key, &input)
 		default:
 			t.Skip()
+		}
+	})
+}
+
+func TestEncodeWriter(t *testing.T) {
+	tests := []struct {
+		name   string
+		key    string
+		length int
+	}{
+		{name: "2I", key: MLI2I, length: 43},
+		{name: "2E", key: MLI2E, length: 43},
+		{name: "4I", key: MLI4I, length: 49},
+		{name: "4E", key: MLI4E, length: 34},
+		{name: "2EE", key: MLI2EE, length: 56},
+		{name: "2BCD2", key: MLI2BCD2, length: 284},
+		{name: "A4E", key: MLIA4E, length: 43},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := EncodeWriter(&buf, tt.key, tt.length)
+			if err != nil {
+				t.Fatalf("EncodeWriter(%q, %d) unexpected error: %v", tt.key, tt.length, err)
+			}
+
+			expected, err := Encode(tt.key, tt.length)
+			if err != nil {
+				t.Fatalf("Encode(%q, %d) unexpected error: %v", tt.key, tt.length, err)
+			}
+
+			if !bytes.Equal(buf.Bytes(), expected) {
+				t.Errorf("EncodeWriter output mismatch: got %x, want %x", buf.Bytes(), expected)
+			}
+		})
+	}
+}
+
+func TestEncodeWriterErrors(t *testing.T) {
+	t.Run("Invalid key", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := EncodeWriter(&buf, "Invalid", 10)
+		if err == nil {
+			t.Error("Expected error for invalid key")
+		}
+	})
+
+	t.Run("Negative length", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := EncodeWriter(&buf, MLI2I, -1)
+		if !errors.Is(err, ErrLength) {
+			t.Errorf("Expected ErrLength, got %v", err)
+		}
+	})
+}
+
+func TestDecodeReader(t *testing.T) {
+	tests := []struct {
+		name   string
+		key    string
+		length int
+	}{
+		{name: "2I", key: MLI2I, length: 43},
+		{name: "2E", key: MLI2E, length: 43},
+		{name: "4I", key: MLI4I, length: 49},
+		{name: "4E", key: MLI4E, length: 34},
+		{name: "2EE", key: MLI2EE, length: 56},
+		{name: "2BCD2", key: MLI2BCD2, length: 284},
+		{name: "A4E", key: MLIA4E, length: 43},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded, err := Encode(tt.key, tt.length)
+			if err != nil {
+				t.Fatalf("Encode(%q, %d) unexpected error: %v", tt.key, tt.length, err)
+			}
+
+			reader := bytes.NewReader(encoded)
+			got, err := DecodeReader(reader, tt.key)
+			if err != nil {
+				t.Fatalf("DecodeReader(%q) unexpected error: %v", tt.key, err)
+			}
+
+			if got != tt.length {
+				t.Errorf("DecodeReader(%q) = %d, want %d", tt.key, got, tt.length)
+			}
+		})
+	}
+}
+
+func TestDecodeReaderErrors(t *testing.T) {
+	t.Run("Invalid key", func(t *testing.T) {
+		reader := bytes.NewReader([]byte{0x00, 0x00})
+		_, err := DecodeReader(reader, "Invalid")
+		if err == nil {
+			t.Error("Expected error for invalid key")
+		}
+	})
+
+	t.Run("Insufficient bytes", func(t *testing.T) {
+		reader := bytes.NewReader([]byte{0x00}) // Only 1 byte for 2I which needs 2
+		_, err := DecodeReader(reader, MLI2I)
+		if !errors.Is(err, ErrByteSize) {
+			t.Errorf("Expected ErrByteSize, got %v", err)
+		}
+	})
+
+	t.Run("EOF", func(t *testing.T) {
+		reader := bytes.NewReader([]byte{})
+		_, err := DecodeReader(reader, MLI2I)
+		if !errors.Is(err, ErrByteSize) {
+			t.Errorf("Expected ErrByteSize, got %v", err)
 		}
 	})
 }
